@@ -200,6 +200,14 @@ class AWSXRayRecorder(object):
         """
         return SubsegmentContextManager(self, name=name, **subsegment_kwargs)
 
+    def create_dummy_segment(self, name):
+        if not global_sdk_config.sdk_enabled():
+            try:
+                self.current_segment()
+            except SegmentNotFoundException:
+                segment = DummySegment(name)
+                self.context.put_segment(segment)
+
     def begin_segment(self, name=None, traceid=None,
                       parent_id=None, sampling=None):
         """
@@ -280,6 +288,8 @@ class AWSXRayRecorder(object):
         :param str name: the name of the subsegment.
         :param str namespace: currently can only be 'local', 'remote', 'aws'.
         """
+
+        self.create_dummy_segment(name)
 
         segment = self.current_segment()
         if not segment:
@@ -407,12 +417,6 @@ class AWSXRayRecorder(object):
         # In the case when the SDK is disabled, we ensure that a parent segment exists, because this is usually
         # handled by the middleware. We generate a dummy segment as the parent segment if one doesn't exist.
         # This is to allow potential segment method calls to not throw exceptions in the captured method.
-        if not global_sdk_config.sdk_enabled():
-            try:
-                self.current_segment()
-            except SegmentNotFoundException:
-                segment = DummySegment(name)
-                self.context.put_segment(segment)
 
         subsegment = self.begin_subsegment(name, namespace)
 
